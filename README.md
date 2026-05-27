@@ -12,10 +12,13 @@ This repository contains the converter previously embedded in `TT6`.
 
 ## Files
 
-- `dx7_to_tt6.py`: main converter script
+- `dx7_to_tt6.py`: main CLI converter
+- `public/`: web GUI files
+- `src/worker.js`: Cloudflare Worker entrypoint
+- `wrangler.toml`: Cloudflare deployment config
 - `LICENSE`: GPL-2.0-only
 
-## Usage
+## CLI Usage
 
 ```bash
 python3 dx7_to_tt6.py INPUT.syx --patch-index 0 --print
@@ -31,6 +34,44 @@ python3 dx7_to_tt6.py INPUT.syx --patch-index 0 \
   --template-fxp kick01.FXP \
   --output-fxp TT6_patch.fxp \
   --output-json TT6_patch.json
+```
+
+## Web GUI
+
+The web app is English-only and runs conversion fully in the browser.
+
+Design goals implemented:
+
+- Minimalist interface
+- 3D panel/button effect
+- Color palette: black/red/white
+- Theme switch:
+  - Dark mode: black-dominant background
+  - Light mode: red-dominant background
+
+## Cloudflare Worker Deployment
+
+Target domain:
+
+- `tt6.83x5t.studio`
+
+Requirements:
+
+- `wrangler` authenticated in the Cloudflare account that owns `83x5t.studio`
+- DNS record for `tt6.83x5t.studio` in that zone
+
+Deploy:
+
+```bash
+cd TT6_Converter
+wrangler deploy
+```
+
+Quick checks:
+
+```bash
+curl -I https://tt6.83x5t.studio/
+curl https://tt6.83x5t.studio/health
 ```
 
 ## Reproducible Release Workflow

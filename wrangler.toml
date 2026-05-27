@@ -1,0 +1,12 @@
+name = "tt6-converter-web"
+main = "src/worker.js"
+compatibility_date = "2026-05-28"
+workers_dev = true
+
+[[routes]]
+pattern = "tt6.83x5t.studio/*"
+zone_name = "83x5t.studio"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"

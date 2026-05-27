@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TT6 Converter Web</title>
+  <meta name="description" content="DX7 SysEx to TT6 preset converter (JSON + FXP) running fully in your browser.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero panel-3d">
+      <div class="hero-text">
+        <p class="kicker">TTLab</p>
+        <h1>TT6 Converter</h1>
+        <p class="subtitle">DX7 SysEx to TT6 JSON/FXP. Browser-only conversion, no upload to server.</p>
+      </div>
+      <button id="themeToggle" class="button-3d ghost" type="button" aria-label="Toggle light and dark theme">Switch Theme</button>
+    </header>
+
+    <section class="grid">
+      <article class="panel-3d">
+        <h2>Input</h2>
+        <div class="field">
+          <label for="syxFile">DX7 SysEx file (.syx)</label>
+          <input id="syxFile" type="file" accept=".syx,.bin,application/octet-stream">
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="patchIndex">Patch index</label>
+            <input id="patchIndex" type="number" min="0" value="0">
+          </div>
+          <div class="field">
+            <label for="programName">Program name (optional)</label>
+            <input id="programName" type="text" maxlength="28" placeholder="DX7 voice name">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="templateFxp">Template FXP (optional)</label>
+          <input id="templateFxp" type="file" accept=".fxp,application/octet-stream">
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="fxid">FXP ID (hex or int)</label>
+            <input id="fxid" type="text" value="0x743C7CA6">
+          </div>
+          <div class="field">
+            <label for="fxVersion">FXP version</label>
+            <input id="fxVersion" type="number" min="0" value="1">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="convertBtn" class="button-3d" type="button">Convert</button>
+        </div>
+      </article>
+
+      <article class="panel-3d">
+        <h2>Output</h2>
+        <p id="statusText" class="status">Ready.</p>
+        <div id="metaBox" class="meta hidden"></div>
+        <div class="actions">
+          <button id="downloadJsonBtn" class="button-3d ghost" type="button" disabled>Download JSON</button>
+          <button id="downloadFxpBtn" class="button-3d ghost" type="button" disabled>Download FXP</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel-3d">
+      <h2>TT6 Parameters (port order 3..33)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Symbol</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="paramsBody">
+            <tr>
+              <td colspan="3" class="empty">No conversion yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
