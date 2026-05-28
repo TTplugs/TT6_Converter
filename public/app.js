@@ -39,11 +39,28 @@ const DX7_TO_TT6_ALGO = [
   12, 12, 13, 13, 14, 14, 15, 15,
 ];
 
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    let c = i;
+    for (let j = 0; j < 8; j += 1) {
+      c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[i] = c >>> 0;
+  }
+  return table;
+})();
+
+const TEXT_ENCODER = new TextEncoder();
+
 const state = {
   jsonText: "",
   fxpBytes: null,
+  batchZipBytes: null,
   outputBaseName: "tt6_patch",
   params: [],
+  batchMode: false,
+  batchCount: 0,
 };
 
 const els = {
@@ -51,12 +68,16 @@ const els = {
   syxFile: document.getElementById("syxFile"),
   patchIndex: document.getElementById("patchIndex"),
   programName: document.getElementById("programName"),
+  batchMode: document.getElementById("batchMode"),
+  batchStart: document.getElementById("batchStart"),
+  batchEnd: document.getElementById("batchEnd"),
   templateFxp: document.getElementById("templateFxp"),
   fxid: document.getElementById("fxid"),
   fxVersion: document.getElementById("fxVersion"),
   convertBtn: document.getElementById("convertBtn"),
   downloadJsonBtn: document.getElementById("downloadJsonBtn"),
   downloadFxpBtn: document.getElementById("downloadFxpBtn"),
+  downloadBatchBtn: document.getElementById("downloadBatchBtn"),
   statusText: document.getElementById("statusText"),
   metaBox: document.getElementById("metaBox"),
   paramsBody: document.getElementById("paramsBody"),
@@ -81,6 +102,14 @@ function parseIntAuto(text) {
   if (/^0x[0-9a-f]+$/i.test(t)) return parseInt(t, 16);
   if (/^-?\d+$/.test(t)) return parseInt(t, 10);
   throw new Error(`Invalid integer value: ${text}`);
+}
+
+function parseNonNegativeInt(text, fieldName) {
+  const value = parseInt(text, 10);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${fieldName} must be a non-negative integer.`);
+  }
+  return value;
 }
 
 function sanitizeName(name, size = 28) {
@@ -349,11 +378,10 @@ function writeFxpBuffer(fxId, fxVersion, name, params) {
   const total = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 28 + (4 * numParams);
   const out = new Uint8Array(total);
   const dv = new DataView(out.buffer);
-  const enc = new TextEncoder();
 
-  out.set(enc.encode("CcnK"), 0);
+  out.set(TEXT_ENCODER.encode("CcnK"), 0);
   dv.setUint32(4, chunkSize, true);
-  out.set(enc.encode("FxCk"), 8);
+  out.set(TEXT_ENCODER.encode("FxCk"), 8);
   dv.setUint32(12, 1, true);
   dv.setUint32(16, fxId >>> 0, true);
   dv.setUint32(20, fxVersion >>> 0, true);
@@ -368,6 +396,94 @@ function writeFxpBuffer(fxId, fxVersion, name, params) {
   return out;
 }
 
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i += 1) {
+    c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function concatUint8(parts) {
+  let total = 0;
+  for (const p of parts) total += p.length;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const p of parts) {
+    out.set(p, offset);
+    offset += p.length;
+  }
+  return out;
+}
+
+function createStoredZip(files) {
+  const localParts = [];
+  const centralParts = [];
+  let localOffset = 0;
+
+  for (const file of files) {
+    const nameBytes = TEXT_ENCODER.encode(file.name);
+    const data = file.data;
+    const crc = crc32(data);
+
+    const localHeader = new Uint8Array(30 + nameBytes.length + data.length);
+    const ldv = new DataView(localHeader.buffer);
+    ldv.setUint32(0, 0x04034b50, true);
+    ldv.setUint16(4, 20, true);
+    ldv.setUint16(6, 0, true);
+    ldv.setUint16(8, 0, true);
+    ldv.setUint16(10, 0, true);
+    ldv.setUint16(12, 0, true);
+    ldv.setUint32(14, crc, true);
+    ldv.setUint32(18, data.length, true);
+    ldv.setUint32(22, data.length, true);
+    ldv.setUint16(26, nameBytes.length, true);
+    ldv.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+    localHeader.set(data, 30 + nameBytes.length);
+    localParts.push(localHeader);
+
+    const centralHeader = new Uint8Array(46 + nameBytes.length);
+    const cdv = new DataView(centralHeader.buffer);
+    cdv.setUint32(0, 0x02014b50, true);
+    cdv.setUint16(4, 20, true);
+    cdv.setUint16(6, 20, true);
+    cdv.setUint16(8, 0, true);
+    cdv.setUint16(10, 0, true);
+    cdv.setUint16(12, 0, true);
+    cdv.setUint16(14, 0, true);
+    cdv.setUint32(16, crc, true);
+    cdv.setUint32(20, data.length, true);
+    cdv.setUint32(24, data.length, true);
+    cdv.setUint16(28, nameBytes.length, true);
+    cdv.setUint16(30, 0, true);
+    cdv.setUint16(32, 0, true);
+    cdv.setUint16(34, 0, true);
+    cdv.setUint16(36, 0, true);
+    cdv.setUint32(38, 0, true);
+    cdv.setUint32(42, localOffset, true);
+    centralHeader.set(nameBytes, 46);
+    centralParts.push(centralHeader);
+
+    localOffset += localHeader.length;
+  }
+
+  const localData = concatUint8(localParts);
+  const centralData = concatUint8(centralParts);
+  const eocd = new Uint8Array(22);
+  const edv = new DataView(eocd.buffer);
+  edv.setUint32(0, 0x06054b50, true);
+  edv.setUint16(4, 0, true);
+  edv.setUint16(6, 0, true);
+  edv.setUint16(8, files.length, true);
+  edv.setUint16(10, files.length, true);
+  edv.setUint32(12, centralData.length, true);
+  edv.setUint32(16, localData.length, true);
+  edv.setUint16(20, 0, true);
+
+  return concatUint8([localData, centralData, eocd]);
+}
+
 function updateStatus(message, isError = false) {
   els.statusText.textContent = message;
   els.statusText.style.color = isError ? "#ffbcc3" : "";
@@ -380,7 +496,20 @@ function toFileNameBase(rawName) {
 
 function renderMeta(meta) {
   els.metaBox.classList.remove("hidden");
+  if (meta.mode === "batch") {
+    els.metaBox.innerHTML = [
+      "<strong>Mode:</strong> Batch",
+      `<strong>Decoded voices:</strong> ${meta.decodedVoices}`,
+      `<strong>Range:</strong> ${meta.rangeStart}..${meta.rangeEnd}`,
+      `<strong>Converted patches:</strong> ${meta.batchCount}`,
+      `<strong>Name source:</strong> ${meta.programName}`,
+      `<strong>FXP ID:</strong> 0x${meta.fxId.toString(16).toUpperCase().padStart(8, "0")}`,
+      `<strong>FXP version:</strong> ${meta.fxVersion}`,
+    ].join("<br>");
+    return;
+  }
   els.metaBox.innerHTML = [
+    "<strong>Mode:</strong> Single patch",
     `<strong>Voice:</strong> ${meta.voiceName}`,
     `<strong>Decoded voices:</strong> ${meta.decodedVoices}`,
     `<strong>Patch index:</strong> ${meta.patchIndex}`,
@@ -413,29 +542,51 @@ function downloadBlob(filename, mime, data) {
   URL.revokeObjectURL(url);
 }
 
+function setDownloadButtons(jsonEnabled, fxpEnabled, batchEnabled) {
+  els.downloadJsonBtn.disabled = !jsonEnabled;
+  els.downloadFxpBtn.disabled = !fxpEnabled;
+  if (els.downloadBatchBtn) {
+    els.downloadBatchBtn.disabled = !batchEnabled;
+  }
+}
+
+function setBatchUiState() {
+  const enabled = Boolean(els.batchMode?.checked);
+  if (els.patchIndex) els.patchIndex.disabled = enabled;
+  if (els.batchStart) els.batchStart.disabled = !enabled;
+  if (els.batchEnd) els.batchEnd.disabled = !enabled;
+}
+
+function makePayload(sourceFile, voicesCount, patchIndex, voiceName, programName, params, bySymbol, fxId, fxVersion) {
+  return {
+    converter: "dx7_to_tt6_web",
+    source_file: sourceFile,
+    decoded_voices: voicesCount,
+    patch_index: patchIndex,
+    voice_name: voiceName,
+    tt6_name: programName,
+    tt6_uri: "urn:asier:lv2:tt6",
+    tt6_params_ordered: params,
+    tt6_params_by_symbol: bySymbol,
+    fxp_hint: {
+      fx_id: fxId,
+      fx_version: fxVersion,
+      num_params: params.length,
+    },
+  };
+}
+
 async function convertNow() {
   const syx = els.syxFile.files[0];
   if (!syx) {
     throw new Error("Please select a DX7 SysEx file.");
   }
-  const patchIndex = parseInt(els.patchIndex.value, 10);
-  if (!Number.isInteger(patchIndex) || patchIndex < 0) {
-    throw new Error("Patch index must be a non-negative integer.");
-  }
-  const fxVersion = parseInt(els.fxVersion.value, 10);
-  if (!Number.isInteger(fxVersion) || fxVersion < 0) {
-    throw new Error("FXP version must be a non-negative integer.");
-  }
+
+  const fxVersion = parseNonNegativeInt(els.fxVersion.value, "FXP version");
   let fxId = parseIntAuto(els.fxid.value || "0x743C7CA6");
 
   const raw = new Uint8Array(await syx.arrayBuffer());
   const voices = extractVoices(raw);
-  if (patchIndex >= voices.length) {
-    throw new Error(`Patch index out of range: ${patchIndex} (decoded voices: ${voices.length}).`);
-  }
-  const voice = voices[patchIndex];
-  const { params, bySymbol } = buildTt6Params(voice);
-  const programName = (els.programName.value || "").trim() || voice.name || `TT6_DX7_${String(patchIndex).padStart(2, "0")}`;
 
   const template = els.templateFxp.files[0];
   let finalFxVersion = fxVersion;
@@ -445,40 +596,151 @@ async function convertNow() {
     finalFxVersion = hdr.fx_version;
   }
 
-  const fxpBytes = writeFxpBuffer(fxId, finalFxVersion, programName, params);
-  const payload = {
-    converter: "dx7_to_tt6_web",
+  const userProgramName = (els.programName.value || "").trim();
+  const isBatch = Boolean(els.batchMode?.checked);
+
+  if (!isBatch) {
+    const patchIndex = parseNonNegativeInt(els.patchIndex.value, "Patch index");
+    if (patchIndex >= voices.length) {
+      throw new Error(`Patch index out of range: ${patchIndex} (decoded voices: ${voices.length}).`);
+    }
+
+    const voice = voices[patchIndex];
+    const { params, bySymbol } = buildTt6Params(voice);
+    const programName = userProgramName || voice.name || `TT6_DX7_${String(patchIndex).padStart(2, "0")}`;
+    const fxpBytes = writeFxpBuffer(fxId, finalFxVersion, programName, params);
+    const payload = makePayload(
+      syx.name,
+      voices.length,
+      patchIndex,
+      voice.name,
+      programName,
+      params,
+      bySymbol,
+      fxId,
+      finalFxVersion,
+    );
+
+    state.jsonText = JSON.stringify(payload, null, 2);
+    state.fxpBytes = fxpBytes;
+    state.batchZipBytes = null;
+    state.outputBaseName = toFileNameBase(programName);
+    state.params = params;
+    state.batchMode = false;
+    state.batchCount = 0;
+
+    renderMeta({
+      mode: "single",
+      voiceName: voice.name,
+      decodedVoices: voices.length,
+      patchIndex,
+      programName,
+      fxId,
+      fxVersion: finalFxVersion,
+    });
+    renderParams(params);
+    setDownloadButtons(true, true, false);
+    return;
+  }
+
+  const requestedStart = parseNonNegativeInt(els.batchStart.value, "Batch start index");
+  const requestedEnd = parseNonNegativeInt(els.batchEnd.value, "Batch end index");
+  if (requestedStart > requestedEnd) {
+    throw new Error("Batch start index must be less than or equal to batch end index.");
+  }
+  if (requestedStart >= voices.length) {
+    throw new Error(`Batch start index out of range: ${requestedStart} (decoded voices: ${voices.length}).`);
+  }
+
+  const actualEnd = Math.min(requestedEnd, voices.length - 1);
+  const files = [];
+  const manifestPatches = [];
+  let previewParams = null;
+
+  for (let index = requestedStart; index <= actualEnd; index += 1) {
+    const voice = voices[index];
+    const { params, bySymbol } = buildTt6Params(voice);
+    const patchTag = String(index).padStart(2, "0");
+    const programName = userProgramName
+      ? `${userProgramName}_${patchTag}`
+      : (voice.name || `TT6_DX7_${patchTag}`);
+    const fileBase = `${patchTag}_${toFileNameBase(programName)}`;
+    const fxpBytes = writeFxpBuffer(fxId, finalFxVersion, programName, params);
+    const payload = makePayload(
+      syx.name,
+      voices.length,
+      index,
+      voice.name,
+      programName,
+      params,
+      bySymbol,
+      fxId,
+      finalFxVersion,
+    );
+    const jsonText = JSON.stringify(payload, null, 2);
+
+    files.push({
+      name: `${fileBase}.json`,
+      data: TEXT_ENCODER.encode(jsonText),
+    });
+    files.push({
+      name: `${fileBase}.fxp`,
+      data: fxpBytes,
+    });
+
+    manifestPatches.push({
+      patch_index: index,
+      voice_name: voice.name,
+      tt6_name: programName,
+      json_file: `${fileBase}.json`,
+      fxp_file: `${fileBase}.fxp`,
+    });
+
+    if (!previewParams) {
+      previewParams = params;
+    }
+  }
+
+  const manifest = {
+    converter: "dx7_to_tt6_web_batch",
     source_file: syx.name,
     decoded_voices: voices.length,
-    patch_index: patchIndex,
-    voice_name: voice.name,
-    tt6_name: programName,
-    tt6_uri: "urn:asier:lv2:tt6",
-    tt6_params_ordered: params,
-    tt6_params_by_symbol: bySymbol,
+    requested_range: [requestedStart, requestedEnd],
+    converted_range: [requestedStart, actualEnd],
+    converted_patches: manifestPatches.length,
     fxp_hint: {
       fx_id: fxId,
       fx_version: finalFxVersion,
-      num_params: params.length,
+      num_params: TT6_SYMBOLS.length,
     },
+    patches: manifestPatches,
   };
 
-  state.jsonText = JSON.stringify(payload, null, 2);
-  state.fxpBytes = fxpBytes;
-  state.outputBaseName = toFileNameBase(programName);
-  state.params = params;
+  files.unshift({
+    name: "TT6_BATCH_manifest.json",
+    data: TEXT_ENCODER.encode(JSON.stringify(manifest, null, 2)),
+  });
+
+  state.jsonText = JSON.stringify(manifest, null, 2);
+  state.fxpBytes = null;
+  state.batchZipBytes = createStoredZip(files);
+  state.outputBaseName = `tt6_batch_${String(requestedStart).padStart(2, "0")}_${String(actualEnd).padStart(2, "0")}`;
+  state.params = previewParams || [];
+  state.batchMode = true;
+  state.batchCount = manifestPatches.length;
 
   renderMeta({
-    voiceName: voice.name,
+    mode: "batch",
     decodedVoices: voices.length,
-    patchIndex,
-    programName,
+    rangeStart: requestedStart,
+    rangeEnd: actualEnd,
+    batchCount: manifestPatches.length,
+    programName: userProgramName || "DX7 voice names",
     fxId,
     fxVersion: finalFxVersion,
   });
-  renderParams(params);
-  els.downloadJsonBtn.disabled = false;
-  els.downloadFxpBtn.disabled = false;
+  renderParams(state.params);
+  setDownloadButtons(true, false, true);
 }
 
 function setTheme(theme) {
@@ -496,10 +758,19 @@ async function onConvertClick() {
     updateStatus("Converting...");
     els.convertBtn.disabled = true;
     await convertNow();
-    updateStatus("Conversion complete. Download JSON and/or FXP.");
+    if (state.batchMode) {
+      updateStatus(`Batch conversion complete (${state.batchCount} patches). Download Batch ZIP.`);
+    } else {
+      updateStatus("Conversion complete. Download JSON and/or FXP.");
+    }
   } catch (error) {
-    els.downloadJsonBtn.disabled = true;
-    els.downloadFxpBtn.disabled = true;
+    state.jsonText = "";
+    state.fxpBytes = null;
+    state.batchZipBytes = null;
+    state.params = [];
+    state.batchMode = false;
+    state.batchCount = 0;
+    setDownloadButtons(false, false, false);
     renderParams([]);
     els.metaBox.classList.add("hidden");
     updateStatus(error instanceof Error ? error.message : String(error), true);
@@ -511,13 +782,23 @@ async function onConvertClick() {
 function setupEvents() {
   els.themeToggle.addEventListener("click", toggleTheme);
   els.convertBtn.addEventListener("click", onConvertClick);
+  els.batchMode?.addEventListener("change", () => {
+    setBatchUiState();
+    setDownloadButtons(false, false, false);
+    updateStatus("Ready.");
+  });
   els.downloadJsonBtn.addEventListener("click", () => {
     if (!state.jsonText) return;
-    downloadBlob(`${state.outputBaseName}.json`, "application/json;charset=utf-8", state.jsonText);
+    const suffix = state.batchMode ? "_manifest" : "";
+    downloadBlob(`${state.outputBaseName}${suffix}.json`, "application/json;charset=utf-8", state.jsonText);
   });
   els.downloadFxpBtn.addEventListener("click", () => {
     if (!state.fxpBytes) return;
     downloadBlob(`${state.outputBaseName}.fxp`, "application/octet-stream", state.fxpBytes);
+  });
+  els.downloadBatchBtn?.addEventListener("click", () => {
+    if (!state.batchZipBytes) return;
+    downloadBlob(`${state.outputBaseName}.zip`, "application/zip", state.batchZipBytes);
   });
 }
 
@@ -533,6 +814,8 @@ function initTheme() {
 function init() {
   initTheme();
   setupEvents();
+  setBatchUiState();
+  setDownloadButtons(false, false, false);
 }
 
 init();

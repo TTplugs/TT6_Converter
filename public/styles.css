@@ -1,52 +1,55 @@
 :root {
   color-scheme: dark;
-  --bg: #070707;
-  --bg-alt: #111113;
-  --panel: #0b0b0d;
-  --panel-2: #101114;
-  --ink: #ffffff;
-  --muted: #c6c6c6;
-
-  /* Main outlines ("black" from reference -> white details) */
-  --outline-main: #f6f6f6;
-
-  /* Thin contrast line ("green" from reference -> subtle accent) */
-  --outline-thin: #9f0f1d;
-
-  --field-face: #0e0e10;
-  --button-face: #2a090f;
-  --button-face-2: #4a0b14;
-
-  --shadow-drop: 0 12px 0 #00000066, 0 20px 30px #00000080;
-  --shadow-inset: inset 0 1px 0 #ffffff16, inset 0 -1px 0 #000000b3;
-
-  --cut: 10px;
-  --cut-sm: 7px;
+  --bg: #0b0c0f;
+  --bg-alt: #171920;
+  --ink: #f5f5f5;
+  --muted: #c2c6cf;
+  --line: #f0f0f0;
+  --line-soft: #707581;
+  --accent: #ef3535;
+  --accent-strong: #ce2020;
+  --panel-bg: #131722;
+  --panel-bg-2: #1b202e;
+  --field-bg: #0f131c;
+  --field-border: #f0f0f0;
+  --th-bg: #242a38;
+  --primary-bg: #ffffff;
+  --primary-ink: #0d1117;
+  --primary-border: #ef3535;
+  --primary-shadow: #343a45;
+  --ghost-bg: #11151e;
+  --ghost-ink: #f5f5f5;
+  --ghost-border: #848b99;
+  --ghost-shadow: #2c3340;
+  --hero-left: #151a24;
+  --hero-right: #2a1218;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-
-  /* "white" in reference -> red */
-  --bg: #a30d1b;
-  --bg-alt: #830915;
-  --panel: #9a0c19;
-  --panel-2: #8d0a16;
-
-  /* "black" in reference -> white */
+  --bg: #b20f20;
+  --bg-alt: #910b19;
   --ink: #ffffff;
-  --muted: #ffd6dc;
-  --outline-main: #ffffff;
-
-  /* "green" in reference -> black (thin) */
-  --outline-thin: #0a0a0a;
-
-  --field-face: #0a0a0a;
-  --button-face: #060606;
-  --button-face-2: #111111;
-
-  --shadow-drop: 0 12px 0 #3f060d80, 0 20px 30px #3a050b8c;
-  --shadow-inset: inset 0 1px 0 #ffffff30, inset 0 -1px 0 #4f060f9e;
+  --muted: #ffe2e6;
+  --line: #ffffff;
+  --line-soft: #181818;
+  --accent: #111111;
+  --accent-strong: #000000;
+  --panel-bg: #b71123;
+  --panel-bg-2: #9e0f1f;
+  --field-bg: #0d0d0d;
+  --field-border: #ffffff;
+  --th-bg: #871020;
+  --primary-bg: #ffffff;
+  --primary-ink: #111111;
+  --primary-border: #111111;
+  --primary-shadow: #620813;
+  --ghost-bg: #111111;
+  --ghost-ink: #ffffff;
+  --ghost-border: #ffffff;
+  --ghost-shadow: #660a15;
+  --hero-left: #c21327;
+  --hero-right: #8f0b19;
 }
 
 * {
@@ -63,54 +66,79 @@ body {
   font-family: "Segoe UI", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
   color: var(--ink);
   background:
-    linear-gradient(135deg, #ffffff08 0 8%, transparent 8% 100%),
-    linear-gradient(315deg, #0000001c 0 10%, transparent 10% 100%),
+    linear-gradient(0deg, #00000018 1px, transparent 1px) 0 0 / 100% 44px,
+    linear-gradient(90deg, #00000012 1px, transparent 1px) 0 0 / 44px 100%,
     linear-gradient(160deg, var(--bg) 0%, var(--bg-alt) 100%);
 }
 
 .app-shell {
-  max-width: 1120px;
+  max-width: 1160px;
   margin: 0 auto;
-  padding: 22px;
+  padding: 26px;
   display: grid;
-  gap: 16px;
+  gap: 20px;
+}
+
+.panel-3d {
+  position: relative;
+  padding: 20px;
+  background: var(--panel-bg);
+  border: 3px solid var(--line);
 }
 
 .hero {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: flex-start;
-  gap: 16px;
+  gap: 18px;
+  background:
+    linear-gradient(90deg, var(--hero-left) 0 58%, var(--hero-right) 58% 100%);
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 58%;
+  width: 3px;
+  background: var(--line);
+  opacity: 0.85;
+  pointer-events: none;
 }
 
 .hero h1 {
-  margin: 0 0 6px;
-  font-size: clamp(1.8rem, 3vw, 2.5rem);
-  line-height: 1.02;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 5vw, 4.6rem);
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+  font-weight: 900;
 }
 
 .kicker {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   color: var(--muted);
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: 0.76rem;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .subtitle {
   margin: 0;
   color: var(--muted);
+  max-width: 56ch;
+  line-height: 1.45;
+  font-size: 1.05rem;
 }
 
 .grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: 20px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 920px) {
   .grid {
     grid-template-columns: 1.2fr 0.8fr;
   }
@@ -118,54 +146,9 @@ body {
 
 h2 {
   margin: 0 0 14px;
-  font-size: 1.02rem;
-  letter-spacing: 0.06em;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-/* Boxy / chamfered frame */
-.panel-3d,
-input,
-.button-3d,
-.meta {
-  clip-path: polygon(
-    var(--cut) 0,
-    calc(100% - var(--cut)) 0,
-    100% var(--cut),
-    100% calc(100% - var(--cut)),
-    calc(100% - var(--cut)) 100%,
-    var(--cut) 100%,
-    0 calc(100% - var(--cut)),
-    0 var(--cut)
-  );
-}
-
-.panel-3d {
-  position: relative;
-  padding: 18px;
-  background:
-    linear-gradient(180deg, #ffffff10 0 1px, transparent 1px 100%),
-    linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
-  border: 2px solid var(--outline-main);
-  box-shadow: var(--shadow-drop), var(--shadow-inset);
-}
-
-.panel-3d::before {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border: 1px solid var(--outline-thin);
-  pointer-events: none;
-  clip-path: polygon(
-    var(--cut-sm) 0,
-    calc(100% - var(--cut-sm)) 0,
-    100% var(--cut-sm),
-    100% calc(100% - var(--cut-sm)),
-    calc(100% - var(--cut-sm)) 100%,
-    var(--cut-sm) 100%,
-    0 calc(100% - var(--cut-sm)),
-    0 var(--cut-sm)
-  );
 }
 
 .field {
@@ -192,82 +175,118 @@ label {
   letter-spacing: 0.02em;
 }
 
-input {
+input:not([type="checkbox"]) {
   width: 100%;
-  border: 2px solid var(--outline-main);
-  background: var(--field-face);
+  border: 2px solid var(--field-border);
+  background: var(--field-bg);
   color: var(--ink);
+  border-radius: 0;
   padding: 10px 11px;
   outline: none;
-  box-shadow: inset 0 0 0 1px var(--outline-thin);
+  box-shadow: none;
 }
 
-input:focus {
-  box-shadow: inset 0 0 0 1px var(--outline-thin), 0 0 0 2px #ffffff1a;
+input:not([type="checkbox"]):focus {
+  border-color: var(--accent-strong);
+  box-shadow: none;
+}
+
+input:not([type="checkbox"]):disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.check-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.check-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .button-3d {
-  position: relative;
-  border: 2px solid var(--outline-main);
-  color: var(--ink);
-  background:
-    linear-gradient(180deg, #ffffff1c 0 1px, transparent 1px 100%),
-    linear-gradient(180deg, var(--button-face) 0%, var(--button-face-2) 100%);
-  padding: 10px 15px;
+  appearance: none;
+  border: 3px solid var(--primary-border);
+  border-radius: 0;
+  background: var(--primary-bg);
+  color: var(--primary-ink);
+  padding: 11px 16px;
   font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  box-shadow: 0 5px 0 #00000066, inset 0 0 0 1px var(--outline-thin);
-  transform: translateY(0);
-  transition: transform 100ms ease, box-shadow 100ms ease, opacity 120ms ease;
+  box-shadow: none;
+  transform: none;
+  transition: background-color 90ms linear, color 90ms linear, border-color 90ms linear, opacity 120ms linear;
+  text-transform: uppercase;
 }
 
 .button-3d:hover {
-  transform: translateY(-1px);
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
 }
 
 .button-3d:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 #00000066, inset 0 0 0 1px var(--outline-thin);
+  background: var(--accent-strong);
+  color: #ffffff;
+  border-color: var(--accent-strong);
+}
+
+.button-3d:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
 }
 
 .button-3d:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .button-3d.ghost {
-  background:
-    linear-gradient(180deg, #ffffff12 0 1px, transparent 1px 100%),
-    linear-gradient(180deg, #111111 0%, #080808 100%);
+  background: var(--ghost-bg);
+  color: var(--ghost-ink);
+  border-color: var(--ghost-border);
+  box-shadow: none;
 }
 
-:root[data-theme="light"] .button-3d.ghost {
-  background:
-    linear-gradient(180deg, #ffffff26 0 1px, transparent 1px 100%),
-    linear-gradient(180deg, #000000 0%, #111111 100%);
+.button-3d.ghost:hover {
+  background: #1d222c;
+  color: #ffffff;
+  border-color: var(--line);
+}
+
+:root[data-theme="light"] .button-3d.ghost:hover {
+  background: #202020;
 }
 
 .status {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   color: var(--muted);
 }
 
 .meta {
   margin-top: 10px;
-  border: 2px solid var(--outline-main);
+  border: 2px solid var(--line);
   padding: 10px;
-  background: linear-gradient(180deg, #00000014 0%, #0000001f 100%);
-  box-shadow: inset 0 0 0 1px var(--outline-thin);
+  border-radius: 0;
+  background: #0000001f;
+  box-shadow: none;
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -278,8 +297,8 @@ input:focus {
 
 .table-wrap {
   overflow-x: auto;
-  border: 2px solid var(--outline-main);
-  box-shadow: inset 0 0 0 1px var(--outline-thin);
+  border: 3px solid var(--line);
+  box-shadow: none;
 }
 
 table {
@@ -291,15 +310,16 @@ th,
 td {
   text-align: left;
   padding: 9px 8px;
-  border-bottom: 1px solid var(--outline-thin);
+  border-bottom: 1px solid var(--line-soft);
   font-size: 0.9rem;
 }
 
 th {
-  color: var(--muted);
+  color: var(--ink);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  background: var(--th-bg);
 }
 
 td:last-child {
@@ -309,4 +329,25 @@ td:last-child {
 .empty {
   text-align: center;
   color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    padding: 14px;
+    gap: 14px;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+    background: linear-gradient(180deg, var(--hero-left) 0 62%, var(--hero-right) 62% 100%);
+  }
+
+  .hero::after {
+    left: 0;
+    right: 0;
+    top: 62%;
+    bottom: auto;
+    width: auto;
+    height: 3px;
+  }
 }
