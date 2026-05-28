@@ -69,8 +69,6 @@ const els = {
   patchIndex: document.getElementById("patchIndex"),
   programName: document.getElementById("programName"),
   batchMode: document.getElementById("batchMode"),
-  batchStart: document.getElementById("batchStart"),
-  batchEnd: document.getElementById("batchEnd"),
   templateFxp: document.getElementById("templateFxp"),
   fxid: document.getElementById("fxid"),
   fxVersion: document.getElementById("fxVersion"),
@@ -500,8 +498,7 @@ function renderMeta(meta) {
     els.metaBox.innerHTML = [
       "<strong>Mode:</strong> Batch",
       `<strong>Decoded voices:</strong> ${meta.decodedVoices}`,
-      `<strong>Range:</strong> ${meta.rangeStart}..${meta.rangeEnd}`,
-      `<strong>Converted patches:</strong> ${meta.batchCount}`,
+      `<strong>Extracted patches:</strong> ${meta.batchCount}`,
       `<strong>Name source:</strong> ${meta.programName}`,
       `<strong>FXP ID:</strong> 0x${meta.fxId.toString(16).toUpperCase().padStart(8, "0")}`,
       `<strong>FXP version:</strong> ${meta.fxVersion}`,
@@ -553,8 +550,6 @@ function setDownloadButtons(jsonEnabled, fxpEnabled, batchEnabled) {
 function setBatchUiState() {
   const enabled = Boolean(els.batchMode?.checked);
   if (els.patchIndex) els.patchIndex.disabled = enabled;
-  if (els.batchStart) els.batchStart.disabled = !enabled;
-  if (els.batchEnd) els.batchEnd.disabled = !enabled;
 }
 
 function makePayload(sourceFile, voicesCount, patchIndex, voiceName, programName, params, bySymbol, fxId, fxVersion) {
@@ -643,46 +638,21 @@ async function convertNow() {
     return;
   }
 
-  const requestedStart = parseNonNegativeInt(els.batchStart.value, "Batch start index");
-  const requestedEnd = parseNonNegativeInt(els.batchEnd.value, "Batch end index");
-  if (requestedStart > requestedEnd) {
-    throw new Error("Batch start index must be less than or equal to batch end index.");
-  }
-  if (requestedStart >= voices.length) {
-    throw new Error(`Batch start index out of range: ${requestedStart} (decoded voices: ${voices.length}).`);
-  }
-
-  const actualEnd = Math.min(requestedEnd, voices.length - 1);
+  const requestedStart = 0;
+  const actualEnd = voices.length - 1;
   const files = [];
   const manifestPatches = [];
   let previewParams = null;
 
   for (let index = requestedStart; index <= actualEnd; index += 1) {
     const voice = voices[index];
-    const { params, bySymbol } = buildTt6Params(voice);
+    const { params } = buildTt6Params(voice);
     const patchTag = String(index).padStart(2, "0");
     const programName = userProgramName
       ? `${userProgramName}_${patchTag}`
       : (voice.name || `TT6_DX7_${patchTag}`);
     const fileBase = `${patchTag}_${toFileNameBase(programName)}`;
     const fxpBytes = writeFxpBuffer(fxId, finalFxVersion, programName, params);
-    const payload = makePayload(
-      syx.name,
-      voices.length,
-      index,
-      voice.name,
-      programName,
-      params,
-      bySymbol,
-      fxId,
-      finalFxVersion,
-    );
-    const jsonText = JSON.stringify(payload, null, 2);
-
-    files.push({
-      name: `${fileBase}.json`,
-      data: TEXT_ENCODER.encode(jsonText),
-    });
     files.push({
       name: `${fileBase}.fxp`,
       data: fxpBytes,
@@ -692,7 +662,6 @@ async function convertNow() {
       patch_index: index,
       voice_name: voice.name,
       tt6_name: programName,
-      json_file: `${fileBase}.json`,
       fxp_file: `${fileBase}.fxp`,
     });
 
@@ -702,12 +671,11 @@ async function convertNow() {
   }
 
   const manifest = {
-    converter: "dx7_to_tt6_web_batch",
+    converter: "dx7_to_tt6_fxp_extract",
     source_file: syx.name,
     decoded_voices: voices.length,
-    requested_range: [requestedStart, requestedEnd],
-    converted_range: [requestedStart, actualEnd],
-    converted_patches: manifestPatches.length,
+    extracted_range: [requestedStart, actualEnd],
+    extracted_patches: manifestPatches.length,
     fxp_hint: {
       fx_id: fxId,
       fx_version: finalFxVersion,
@@ -721,7 +689,7 @@ async function convertNow() {
     data: TEXT_ENCODER.encode(JSON.stringify(manifest, null, 2)),
   });
 
-  state.jsonText = JSON.stringify(manifest, null, 2);
+  state.jsonText = "";
   state.fxpBytes = null;
   state.batchZipBytes = createStoredZip(files);
   state.outputBaseName = `tt6_batch_${String(requestedStart).padStart(2, "0")}_${String(actualEnd).padStart(2, "0")}`;
@@ -732,15 +700,13 @@ async function convertNow() {
   renderMeta({
     mode: "batch",
     decodedVoices: voices.length,
-    rangeStart: requestedStart,
-    rangeEnd: actualEnd,
     batchCount: manifestPatches.length,
     programName: userProgramName || "DX7 voice names",
     fxId,
     fxVersion: finalFxVersion,
   });
   renderParams(state.params);
-  setDownloadButtons(true, false, true);
+  setDownloadButtons(false, false, true);
 }
 
 function setTheme(theme) {
@@ -759,7 +725,7 @@ async function onConvertClick() {
     els.convertBtn.disabled = true;
     await convertNow();
     if (state.batchMode) {
-      updateStatus(`Batch conversion complete (${state.batchCount} patches). Download Batch ZIP.`);
+      updateStatus(`FXP extraction complete (${state.batchCount} patches). Download FXP ZIP.`);
     } else {
       updateStatus("Conversion complete. Download JSON and/or FXP.");
     }
@@ -789,8 +755,7 @@ function setupEvents() {
   });
   els.downloadJsonBtn.addEventListener("click", () => {
     if (!state.jsonText) return;
-    const suffix = state.batchMode ? "_manifest" : "";
-    downloadBlob(`${state.outputBaseName}${suffix}.json`, "application/json;charset=utf-8", state.jsonText);
+    downloadBlob(`${state.outputBaseName}.json`, "application/json;charset=utf-8", state.jsonText);
   });
   els.downloadFxpBtn.addEventListener("click", () => {
     if (!state.fxpBytes) return;
